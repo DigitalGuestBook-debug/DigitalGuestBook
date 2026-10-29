@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Guest Book</title>
+<meta name="theme-color" content="#100e0b">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Jost:wght@400;500&display=swap">
+<style>
+:root{--emas:#c9a961;--emas-t:#a8863f;--gading:#faf6ee;--tinta:#2a2520;--garis:#e8dec8;--aksen:#d4b46a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:'Jost',Arial,sans-serif;background:var(--gading);color:var(--tinta)}
+[hidden]{display:none!important}
+h1{font-family:'Cormorant Garamond',Georgia,serif}
+.head{background:radial-gradient(ellipse at 50% 0%,#33291d 0%,#16130f 72%);color:#f3e6c4;text-align:center;padding:26px 16px 20px;border-bottom:3px double var(--emas)}
+.head.ringkas{padding:16px}
+.head h1{margin:8px 0 2px;font-size:34px;font-weight:600;letter-spacing:.02em;color:#f6ebcf}
+.head.ringkas h1{font-size:26px}
+.eyebrow{font-size:11px;letter-spacing:.38em;text-transform:uppercase;color:var(--emas)}
+.orn{display:flex;align-items:center;justify-content:center;gap:12px;color:var(--emas);font-size:12px;margin:8px 0}
+.orn::before,.orn::after{content:"";width:64px;height:1px;background:linear-gradient(90deg,transparent,var(--emas))}
+.orn::after{transform:scaleX(-1)}
+.acara{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:#cdb989}
+.cnt{display:inline-block;margin-top:14px;padding:7px 20px;border:1px solid rgba(201,169,97,.55);border-radius:999px;font-size:14px;letter-spacing:.06em;color:#f3e6c4}
+.tools{padding:16px 14px 6px}
+#q{width:100%;padding:15px 18px;font:400 18px 'Jost',sans-serif;color:var(--tinta);background:#fff;border:1px solid var(--emas);border-radius:12px;outline:none;box-shadow:0 2px 10px rgba(168,134,63,.12)}
+#q:focus{box-shadow:0 0 0 3px rgba(201,169,97,.28)}
+.sec{width:100%;padding:13px;font:500 13px 'Jost',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--emas-t);background:#fff;border:1px solid var(--emas);border-radius:12px}
+#kosong{text-align:center;padding:28px;color:#9a8f7a;font:italic 500 22px 'Cormorant Garamond',Georgia,serif}
+#list{padding-bottom:150px}
+.item{display:flex;align-items:center;gap:14px;background:#fff;margin:8px 14px;padding:14px 16px;border:1px solid var(--garis);border-radius:14px;box-shadow:0 2px 8px rgba(60,45,20,.05);cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.item.pilih{border-color:var(--emas);box-shadow:0 0 0 2px rgba(201,169,97,.25)}
+.item.done{background:#f4f1e6;border-style:dashed}
+.item.done .n1{color:#8c8570}
+.item input{-webkit-appearance:none;appearance:none;flex:none;width:28px;height:28px;margin:0;border:1.5px solid var(--emas);border-radius:50%;background:#fff;display:grid;place-items:center}
+.item input::after{content:"";width:8px;height:14px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);margin-top:-3px;transition:transform .15s}
+.item input:checked{background:linear-gradient(135deg,#d8bb74,#b08d45);border-color:#b08d45}
+.item input:checked::after{transform:rotate(45deg) scale(1)}
+.nm{flex:1;min-width:0}
+.n1{font:600 22px/1.15 'Cormorant Garamond',Georgia,serif}
+.kat{margin-top:3px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a09580}
+.jam{font-size:12px;letter-spacing:.08em;color:#6b8a73;white-space:nowrap}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:28px 14px 16px;background:linear-gradient(to top,var(--gading) 62%,rgba(250,246,238,0))}
+.pesan{min-height:18px;text-align:center;color:#a14a3b;font-size:14px;padding-bottom:6px}
+.btn{width:100%;padding:17px;font:500 14px 'Jost',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#1b1610;background:linear-gradient(135deg,#e2c887,#b08d45);border:0;border-radius:12px;box-shadow:0 6px 18px rgba(168,134,63,.35)}
+.btn:disabled{opacity:.6}
+.btn.sek{background:transparent;color:var(--emas);border:1px solid var(--emas);box-shadow:none}
+#vScan{min-height:100vh;background:#100e0b;color:#f3e6c4;display:flex;flex-direction:column}
+.kamera{position:relative;flex:1;min-height:320px;margin:16px;border-radius:18px;overflow:hidden;background:#000;border:1px solid rgba(201,169,97,.4)}
+.kamera video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.kamera video.cermin{transform:scaleX(-1)}
+.bingkai{position:absolute;inset:14%;pointer-events:none}
+.bingkai i{position:absolute;width:34px;height:34px;border:3px solid var(--emas)}
+.bingkai i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+.bingkai i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+.bingkai i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 10px}
+.bingkai i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 10px 0}
+.sapu{position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,var(--emas),transparent);animation:sapu 2.4s ease-in-out infinite}
+.infoscan{text-align:center;padding:0 16px 8px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#cdb989}
+.infoscan.err{color:#e59a8f}
+.aksiscan{display:flex;gap:10px;padding:8px 16px 22px}
+.aksiscan .btn{flex:1;padding:15px}
+.layar{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse at 50% 40%,#33291d 0%,#0f0d0a 78%);color:#f6ebcf;animation:masuk .35s ease both;overflow:auto}
+.layar .box{padding:28px;max-width:560px;animation:naik .9s .1s ease both}
+.cincin{width:120px;height:120px;margin:0 auto 14px;overflow:visible}
+.cincin .ring{fill:none;stroke:var(--aksen);stroke-width:1.6;stroke-dasharray:315;stroke-dashoffset:315;transform-box:fill-box;transform-origin:center;transform:rotate(-90deg);animation:gambar 1.1s ease forwards}
+.cincin path{fill:none;stroke:var(--aksen);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:100;stroke-dashoffset:100;animation:gambar .7s .7s ease forwards}
+.cincin .titik{fill:var(--aksen)}
+.layar .eyebrow{color:var(--aksen)}
+.layar h1{font-size:42px;font-weight:600;margin:10px 0 4px;color:#f6ebcf}
+.layar .orn{color:var(--aksen)}
+.layar .orn::before,.layar .orn::after{background:linear-gradient(90deg,transparent,var(--aksen))}
+.layar .nama{font:italic 500 40px/1.2 'Cormorant Garamond',Georgia,serif;color:var(--aksen);margin:8px 0}
+.layar .nama.kecil{font-size:26px;margin:4px 0}
+.layar .cat{font-size:17px;color:#d7cbb0;line-height:1.5;margin:10px 0 0}
+.layar .syukur{margin-top:20px;font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:#b9a877}
+.layar .lagi{margin-top:28px;padding:14px 30px;border:1px solid var(--aksen);color:var(--aksen);background:transparent;border-radius:999px;font:500 13px 'Jost',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+@keyframes gambar{to{stroke-dashoffset:0}}
+@keyframes naik{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes masuk{from{opacity:0}to{opacity:1}}
+@keyframes sapu{0%,100%{top:14%}50%{top:84%}}
+</style>
+</head>
+<body>
+
+<div id="vScan" hidden>
+  <div class="head ringkas">
+    <div class="eyebrow">Digital Guest Book</div>
+    <h1>Scan Kehadiran</h1>
+    <div class="acara">WEDDING OF HAIKAL &amp; JASMINE</div>
+    <div class="cnt" id="statScan">Memuat...</div>
+  </div>
+  <div class="kamera">
+    <video id="vid" playsinline muted autoplay></video>
+    <div class="bingkai"><i></i><i></i><i></i><i></i></div>
+    <div class="sapu"></div>
+  </div>
+  <div id="infoScan" class="infoscan">Menyiapkan kamera...</div>
+  <div class="aksiscan">
+    <button class="btn sek" type="button" onclick="gantiKamera()">Ganti Kamera</button>
+    <button class="btn" type="button" onclick="bukaCari()">Cari Nama</button>
+  </div>
+</div>
+
+<div id="vList" hidden>
+  <div class="head">
+    <div class="eyebrow">Digital Guest Book</div>
+    <h1 id="jdl"></h1>
+    <div class="orn">✦</div>
+    <div class="acara">WEDDING OF HAIKAL &amp; JASMINE</div>
+    <div class="cnt" id="cnt"></div>
+  </div>
+  <div class="tools">
+    <button id="btnKembali" class="sec" type="button" onclick="tutupList()" hidden style="margin-bottom:10px">‹ Kembali ke Scan</button>
+    <input id="q" type="search" placeholder="Ketik nama tamu..." oninput="cari()" autocomplete="off">
+    <button id="btnSemua" class="sec" type="button" onclick="pilihSemua()">Pilih semua yang belum hadir</button>
+  </div>
+  <div id="list"></div>
+  <div id="kosong" hidden>Nama tidak ditemukan</div>
+  <div class="bar">
+    <div id="pesan" class="pesan"></div>
+    <button id="btn" class="btn" type="button" onclick="simpan()">Simpan Kehadiran (0)</button>
+  </div>
+</div>
+
+<div id="vHasil" class="layar" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+/* =====================  PENGATURAN  ===================== */
+// URL Web App Apps Script (yang berakhiran /exec)
+var API_URL = 'https://script.google.com/macros/s/AKfycbyJg_TKygNCFkFDfHT22RSY3MqajGmJCSqaiRXbzXoBkKks6HmLhH6Dji0nb6_ShEaT/exec';
+var ACARA = 'WEDDING OF HAIKAL & JASMINE';
+/* ======================================================== */
+
+var MODE = 'scan';
+var DATA = null;
+var STAT = { hadir: 0, total: 0 };
+var IKON = {
+  success: '<svg class="cincin" viewBox="0 0 110 110"><circle class="ring" cx="55" cy="55" r="50"/><path d="M36 57 L50 71 L78 41"/></svg>',
+  info: '<svg class="cincin" viewBox="0 0 110 110"><circle class="ring" cx="55" cy="55" r="50"/><path d="M55 50 L55 78"/><circle class="titik" cx="55" cy="37" r="3"/></svg>',
+  warning: '<svg class="cincin" viewBox="0 0 110 110"><circle class="ring" cx="55" cy="55" r="50"/><path d="M55 33 L55 62"/><path d="M55 77 L55 77.1"/></svg>',
+  error: '<svg class="cincin" viewBox="0 0 110 110"><circle class="ring" cx="55" cy="55" r="50"/><path d="M39 39 L71 71"/><path d="M71 39 L39 71"/></svg>'
+};
+var WARNA = {success:'#d4b46a',info:'#9db8d8',warning:'#e3a95f',error:'#e08e8e'};
+var sibuk = false, jalan = false, stream = null, fm = 'environment';
+var terakhir = '', tTerakhir = 0, timerHasil = null, aksiTutup = null, audio = null;
+var cv = document.createElement('canvas');
+var ctx = cv.getContext('2d', {willReadFrequently: true});
+
+/* ---------- komunikasi ke Apps Script (pengganti google.script.run) ---------- */
+function panggil(params){
+  var q = [];
+  for (var k in params) q.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+  return fetch(API_URL + '?' + q.join('&'), {redirect: 'follow'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.tipe === 'error' && d.judul === 'Error') throw new Error(d.pesan);
+      return d;
+    });
+}
+function apiDaftar(mode, grup){ return panggil({api:'daftar', mode:mode, grup:grup || ''}); }
+function apiCheckin(nama){ return panggil({api:'checkin', nama:nama}); }
+function apiSimpan(mode, grup, rows){ return panggil({api:'simpan', mode:mode, grup:grup || '', rows:JSON.stringify(rows)}); }
+function apiStat(){ return panggil({api:'stat'}); }
+
+function $(id){ return document.getElementById(id); }
+function tambah(induk, tag, kelas, teks){
+  var el = document.createElement(tag);
+  if (kelas) el.className = kelas;
+  if (teks !== undefined && teks !== '') el.textContent = teks;
+  induk.appendChild(el);
+  return el;
+}
+function updateStat(h, t){
+  $('statScan').textContent = h + ' dari ' + t + ' tamu hadir';
+}
+function bunyi(ok){
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    var o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'sine'; o.frequency.value = ok ? 880 : 330; g.gain.value = 0.06;
+    o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + (ok ? 0.18 : 0.3));
+  } catch (e) {}
+}
+
+/* ---------- layar hasil ---------- */
+function tampilHasil(h, auto, aksi){
+  var l = $('vHasil');
+  clearTimeout(timerHasil);
+  l.innerHTML = '';
+  l.style.setProperty('--aksen', WARNA[h.tipe] || WARNA.success);
+  var box = tambah(l, 'div', 'box');
+  var wadah = document.createElement('div');
+  wadah.innerHTML = IKON[h.tipe] || '';
+  if (wadah.firstChild) box.appendChild(wadah.firstChild);
+  tambah(box, 'div', 'eyebrow', ACARA);
+  tambah(box, 'h1', '', h.judul);
+  tambah(box, 'div', 'orn', '✦');
+  var nama = h.nama || [];
+  for (var i = 0; i < nama.length; i++) tambah(box, 'div', 'nama' + (nama.length > 3 ? ' kecil' : ''), nama[i]);
+  if (nama.length > 1) tambah(box, 'p', 'cat', nama.length + ' tamu tercatat hadir');
+  if (h.catatan) tambah(box, 'p', 'cat', h.catatan);
+  if (h.tipe === 'success') tambah(box, 'div', 'syukur', 'Terima kasih atas kehadiran Anda');
+  aksiTutup = aksi || null;
+  if (aksi) {
+    var b = tambah(box, 'button', 'lagi', aksi.teks);
+    b.onclick = function(ev){ ev.stopPropagation(); tutupHasil(); };
+  }
+  l.onclick = auto ? tutupHasil : null;
+  l.hidden = false;
+  if (auto) timerHasil = setTimeout(tutupHasil, h.tipe === 'success' ? 3500 : 4500);
+  if (h.hadir != null) updateStat(h.hadir, h.total);
+  bunyi(h.tipe === 'success');
+}
+function tutupHasil(){
+  clearTimeout(timerHasil);
+  $('vHasil').hidden = true;
+  var f = aksiTutup; aksiTutup = null;
+  if (f && f.fn) f.fn();
+  if (listTerbuka()) tutupList(); else { sibuk = false; infoScan('Arahkan QR undangan ke kamera'); }
+}
+
+/* ---------- daftar (grup / cari nama) ---------- */
+function listTerbuka(){ return !$('vList').hidden; }
+function terpilih(){ return document.querySelectorAll('#list input:not(:disabled):checked'); }
+function pesan(t){ $('pesan').textContent = t || ''; }
+function hitung(){
+  pesan('');
+  $('btn').textContent = 'Simpan Kehadiran (' + terpilih().length + ')';
+}
+function renderList(d){
+  DATA = d;
+  $('jdl').textContent = d.judul;
+  $('cnt').textContent = d.hadir + ' dari ' + d.anggota.length + ' sudah hadir';
+  $('q').hidden = d.mode !== 'cari';
+  $('q').value = '';
+  $('btnSemua').hidden = d.mode === 'cari';
+  var box = $('list'); box.innerHTML = '';
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < d.anggota.length; i++) {
+    (function(t){
+      var lb = document.createElement('label');
+      lb.className = 'item' + (t.hadir ? ' done' : '');
+      lb.setAttribute('data-n', (t.nama + ' ' + (d.mode === 'cari' ? t.kat : '')).toLowerCase());
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = t.row;
+      if (t.hadir) { cb.checked = true; cb.disabled = true; }
+      else cb.onchange = function(){ lb.classList.toggle('pilih', cb.checked); hitung(); };
+      lb.appendChild(cb);
+      var nm = tambah(lb, 'span', 'nm');
+      tambah(nm, 'div', 'n1', t.nama);
+      if (d.mode === 'cari' && t.kat) tambah(nm, 'div', 'kat', t.kat);
+      if (t.hadir) tambah(lb, 'span', 'jam', 'hadir ' + t.jam);
+      frag.appendChild(lb);
+    })(d.anggota[i]);
+  }
+  box.appendChild(frag);
+  $('kosong').hidden = true;
+  hitung();
+}
+function pilihSemua(){
+  var semua = document.querySelectorAll('#list input:not(:disabled)');
+  for (var i = 0; i < semua.length; i++) {
+    semua[i].checked = true;
+    semua[i].parentNode.classList.add('pilih');
+  }
+  hitung();
+}
+function cari(){
+  var q = $('q').value.toLowerCase().trim();
+  var items = document.querySelectorAll('#list .item'), tampil = 0;
+  for (var i = 0; i < items.length; i++) {
+    var ok = !q || items[i].getAttribute('data-n').indexOf(q) > -1;
+    items[i].style.display = ok ? '' : 'none';
+    if (ok) tampil++;
+  }
+  $('kosong').hidden = tampil > 0;
+}
+function bukaList(d){
+  renderList(d);
+  $('vScan').hidden = true;
+  $('vList').hidden = false;
+  window.scrollTo(0, 0);
+  if (d.mode === 'cari') setTimeout(function(){ $('q').focus(); }, 150);
+}
+function tutupList(){
+  $('vList').hidden = true;
+  $('vScan').hidden = false;
+  sibuk = false;
+  infoScan('Arahkan QR undangan ke kamera');
+  apiStat().then(function(s){ updateStat(s.hadir, s.total); }).catch(function(){});
+}
+function muatUlang(){
+  apiDaftar(DATA.mode, DATA.grup).then(renderList).catch(function(e){ pesan('Gagal memuat: ' + e.message); });
+}
+function simpan(){
+  var cek = terpilih(), rows = [];
+  for (var i = 0; i < cek.length; i++) rows.push(Number(cek[i].value));
+  if (!rows.length) { pesan('Pilih minimal satu nama.'); return; }
+  var btn = $('btn');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+  apiSimpan(DATA.mode, DATA.grup, rows)
+    .then(function(res){
+      btn.disabled = false; hitung();
+      var h = res.nama.length
+        ? {tipe:'success', judul:'Selamat Datang', nama:res.nama, hadir:res.hadir, total:res.total}
+        : {tipe:'info', judul:'Tidak Ada Perubahan', catatan:'Semua nama yang dipilih sudah tercatat hadir.'};
+      tampilHasil(h, true);
+    })
+    .catch(function(err){
+      btn.disabled = false; hitung();
+      pesan('Gagal menyimpan: ' + err.message);
+    });
+}
+
+/* ---------- scanner ---------- */
+function infoScan(t, err){
+  var el = $('infoScan');
+  el.textContent = t;
+  el.className = 'infoscan' + (err ? ' err' : '');
+}
+function urai(t){
+  if (t.indexOf('/macros/s/') < 0) return null;
+  var i = t.indexOf('?'); if (i < 0) return null;
+  var q = t.slice(i + 1).split('#')[0].split('&'), o = {};
+  for (var k = 0; k < q.length; k++) {
+    var a = q[k].split('=');
+    var v = a.slice(1).join('=').split('+').join(' ');
+    try { v = decodeURIComponent(v); } catch (e) {}
+    o[a[0]] = v;
+  }
+  if (o.nama) return {jenis:'nama', v:o.nama};
+  if (o.grup) return {jenis:'grup', v:o.grup};
+  if (o.cari) return {jenis:'cari', v:''};
+  return null;
+}
+function gagalScan(err){
+  infoScan('Gagal: ' + (err && err.message ? err.message : err), true);
+  sibuk = false; terakhir = '';
+}
+function dariServer(d){
+  if (!d.anggota.length) { tampilHasil({tipe:'error', judul:'Tidak Ditemukan', catatan:'Daftar tidak ditemukan.'}, true); return; }
+  bukaList(d);
+}
+function bukaCari(){
+  if (sibuk) return;
+  sibuk = true; infoScan('Memuat daftar tamu...');
+  apiDaftar('cari', '').then(dariServer).catch(gagalScan);
+}
+function tangani(teks){
+  var skrg = Date.now();
+  if (sibuk) return;
+  if (teks === terakhir && skrg - tTerakhir < 6000) return;
+  terakhir = teks; tTerakhir = skrg;
+  var p = urai(teks);
+  sibuk = true;
+  if (!p) { tampilHasil({tipe:'error', judul:'QR Tidak Valid', catatan:'QR ini bukan QR undangan pernikahan.'}, true); return; }
+  infoScan('Memeriksa data tamu...');
+  if (p.jenis === 'nama') {
+    apiCheckin(p.v).then(function(r){
+      var ok = r.tipe === 'success';
+      tampilHasil({tipe:r.tipe, judul:r.judul, nama: ok ? [r.nama] : [], catatan: ok ? '' : r.pesan, hadir:r.hadir, total:r.total}, true);
+    }).catch(gagalScan);
+  } else if (p.jenis === 'grup') {
+    apiDaftar('grup', p.v).then(dariServer).catch(gagalScan);
+  } else {
+    apiDaftar('cari', '').then(dariServer).catch(gagalScan);
+  }
+}
+function pindai(){
+  var vid = $('vid');
+  if (jalan && !sibuk && vid.readyState >= 2 && vid.videoWidth && typeof jsQR === 'function') {
+    var skala = Math.min(1, 800 / Math.max(vid.videoWidth, vid.videoHeight));
+    cv.width = Math.round(vid.videoWidth * skala);
+    cv.height = Math.round(vid.videoHeight * skala);
+    ctx.drawImage(vid, 0, 0, cv.width, cv.height);
+    var img = ctx.getImageData(0, 0, cv.width, cv.height);
+    var k = jsQR(img.data, img.width, img.height, {inversionAttempts: 'dontInvert'});
+    if (k && k.data) tangani(k.data);
+  }
+  setTimeout(pindai, 110);
+}
+function stopKamera(){
+  jalan = false;
+  if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+}
+function mulaiKamera(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    infoScan('Kamera tidak didukung di browser ini', true); return;
+  }
+  navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: fm}, width: {ideal: 1280}, height: {ideal: 720}}, audio: false})
+    .then(function(s){
+      stream = s;
+      var vid = $('vid');
+      vid.className = fm === 'user' ? 'cermin' : '';
+      vid.srcObject = s;
+      return vid.play();
+    })
+    .then(function(){ jalan = true; infoScan('Arahkan QR undangan ke kamera'); })
+    .catch(function(e){ infoScan('Kamera tidak bisa dibuka (' + e.name + '). Izinkan akses kamera.', true); });
+}
+function gantiKamera(){
+  fm = fm === 'environment' ? 'user' : 'environment';
+  stopKamera(); mulaiKamera();
+}
+function kunciLayar(){
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); } catch (e) {}
+}
+
+/* ---------- mulai ---------- */
+$('vScan').hidden = false;
+$('btnKembali').hidden = false;
+apiStat().then(function(s){ STAT = s; updateStat(s.hadir, s.total); })
+  .catch(function(e){ $('statScan').textContent = 'Gagal memuat data'; });
+mulaiKamera(); pindai(); kunciLayar();
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) kunciLayar(); });
+var buf = '';
+document.addEventListener('keydown', function(e){
+  if (listTerbuka() || !$('vHasil').hidden) return;
+  if (e.key === 'Enter') { if (buf.length > 8) tangani(buf); buf = ''; }
+  else if (e.key && e.key.length === 1) buf += e.key;
+});
+</script>
+</body>
+</html>
