@@ -83,7 +83,7 @@ h1{font-family:'Cormorant Garamond',Georgia,serif}
 </style>
 </head>
 <body>
-
+ 
 <div id="vScan" hidden>
   <div class="head ringkas">
     <div class="eyebrow">Digital Guest Book</div>
@@ -102,7 +102,7 @@ h1{font-family:'Cormorant Garamond',Georgia,serif}
     <button class="btn" type="button" onclick="bukaCari()">Cari Nama</button>
   </div>
 </div>
-
+ 
 <div id="vList" hidden>
   <div class="head">
     <div class="eyebrow">Digital Guest Book</div>
@@ -123,9 +123,9 @@ h1{font-family:'Cormorant Garamond',Georgia,serif}
     <button id="btn" class="btn" type="button" onclick="simpan()">Simpan Kehadiran (0)</button>
   </div>
 </div>
-
+ 
 <div id="vHasil" class="layar" hidden></div>
-
+ 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
 /* =====================  PENGATURAN  ===================== */
@@ -133,7 +133,7 @@ h1{font-family:'Cormorant Garamond',Georgia,serif}
 var API_URL = 'https://script.google.com/macros/s/AKfycbwpL_BpV22GKb5vq2ZCmmtPlvCQMpVeFriS-Qb3v1YmXhEeNbgtn9UxF8Y9Nd19_z30/exec';
 var ACARA = 'WEDDING OF HAIKAL & JASMINE';
 /* ======================================================== */
-
+ 
 var MODE = 'scan';
 var DATA = null;
 var STAT = { hadir: 0, total: 0 };
@@ -148,7 +148,7 @@ var sibuk = false, jalan = false, stream = null, fm = 'environment';
 var terakhir = '', tTerakhir = 0, timerHasil = null, aksiTutup = null, audio = null;
 var cv = document.createElement('canvas');
 var ctx = cv.getContext('2d', {willReadFrequently: true});
-
+ 
 /* ---------- komunikasi ke Apps Script (pengganti google.script.run) ---------- */
 function panggil(params){
   var q = [];
@@ -164,7 +164,7 @@ function apiDaftar(mode, grup){ return panggil({api:'daftar', mode:mode, grup:gr
 function apiCheckin(nama){ return panggil({api:'checkin', nama:nama}); }
 function apiSimpan(mode, grup, rows){ return panggil({api:'simpan', mode:mode, grup:grup || '', rows:JSON.stringify(rows)}); }
 function apiStat(){ return panggil({api:'stat'}); }
-
+ 
 function $(id){ return document.getElementById(id); }
 function tambah(induk, tag, kelas, teks){
   var el = document.createElement(tag);
@@ -185,7 +185,7 @@ function bunyi(ok){
     o.start(); o.stop(audio.currentTime + (ok ? 0.18 : 0.3));
   } catch (e) {}
 }
-
+ 
 /* ---------- layar hasil ---------- */
 function tampilHasil(h, auto, aksi){
   var l = $('vHasil');
@@ -222,7 +222,7 @@ function tutupHasil(){
   if (f && f.fn) f.fn();
   if (listTerbuka()) tutupList(); else { sibuk = false; infoScan('Arahkan QR undangan ke kamera'); }
 }
-
+ 
 /* ---------- daftar (grup / cari nama) ---------- */
 function listTerbuka(){ return !$('vList').hidden; }
 function terpilih(){ return document.querySelectorAll('#list input:not(:disabled):checked'); }
@@ -316,7 +316,7 @@ function simpan(){
       pesan('Gagal menyimpan: ' + err.message);
     });
 }
-
+ 
 /* ---------- scanner ---------- */
 function infoScan(t, err){
   var el = $('infoScan');
@@ -371,16 +371,34 @@ function tangani(teks){
     apiDaftar('cari', '').then(dariServer).catch(gagalScan);
   }
 }
+var detektor = null, mendeteksi = false;
+try { if ('BarcodeDetector' in window) detektor = new BarcodeDetector({formats: ['qr_code']}); } catch (e) { detektor = null; }
+ 
+function bacaJsQR(vid){
+  if (typeof jsQR !== 'function') return;
+  var skala = Math.min(1, 1280 / Math.max(vid.videoWidth, vid.videoHeight));
+  cv.width = Math.round(vid.videoWidth * skala);
+  cv.height = Math.round(vid.videoHeight * skala);
+  ctx.drawImage(vid, 0, 0, cv.width, cv.height);
+  var img = ctx.getImageData(0, 0, cv.width, cv.height);
+  var k = jsQR(img.data, img.width, img.height, {inversionAttempts: 'attemptBoth'});
+  if (k && k.data) tangani(k.data);
+}
 function pindai(){
   var vid = $('vid');
-  if (jalan && !sibuk && vid.readyState >= 2 && vid.videoWidth && typeof jsQR === 'function') {
-    var skala = Math.min(1, 800 / Math.max(vid.videoWidth, vid.videoHeight));
-    cv.width = Math.round(vid.videoWidth * skala);
-    cv.height = Math.round(vid.videoHeight * skala);
-    ctx.drawImage(vid, 0, 0, cv.width, cv.height);
-    var img = ctx.getImageData(0, 0, cv.width, cv.height);
-    var k = jsQR(img.data, img.width, img.height, {inversionAttempts: 'dontInvert'});
-    if (k && k.data) tangani(k.data);
+  if (jalan && !sibuk && !mendeteksi && vid.readyState >= 2 && vid.videoWidth) {
+    if (detektor) {
+      mendeteksi = true;
+      detektor.detect(vid)
+        .then(function(h){
+          if (h && h.length && h[0].rawValue) tangani(h[0].rawValue);
+          else bacaJsQR(vid);
+        })
+        .catch(function(){ try { bacaJsQR(vid); } catch (e) {} })
+        .then(function(){ mendeteksi = false; setTimeout(pindai, 100); });
+      return;
+    }
+    bacaJsQR(vid);
   }
   setTimeout(pindai, 110);
 }
@@ -392,12 +410,17 @@ function mulaiKamera(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     infoScan('Kamera tidak didukung di browser ini', true); return;
   }
-  navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: fm}, width: {ideal: 1280}, height: {ideal: 720}}, audio: false})
+  navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: fm}, width: {ideal: 1920}, height: {ideal: 1080}}, audio: false})
     .then(function(s){
       stream = s;
       var vid = $('vid');
       vid.className = fm === 'user' ? 'cermin' : '';
       vid.srcObject = s;
+      try {
+        var tr = s.getVideoTracks()[0];
+        var cap = tr.getCapabilities ? tr.getCapabilities() : {};
+        if (cap.focusMode && cap.focusMode.indexOf('continuous') > -1) tr.applyConstraints({advanced: [{focusMode: 'continuous'}]});
+      } catch (e) {}
       return vid.play();
     })
     .then(function(){ jalan = true; infoScan('Arahkan QR undangan ke kamera'); })
@@ -410,7 +433,7 @@ function gantiKamera(){
 function kunciLayar(){
   try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); } catch (e) {}
 }
-
+ 
 /* ---------- mulai ---------- */
 $('vScan').hidden = false;
 $('btnKembali').hidden = false;
@@ -427,3 +450,4 @@ document.addEventListener('keydown', function(e){
 </script>
 </body>
 </html>
+ 
