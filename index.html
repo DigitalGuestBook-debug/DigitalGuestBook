@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -122,7 +122,7 @@ h1{font-family:var(--serif)}
   <div class="head ringkas">
     <div class="eyebrow">Digital Guest Book</div>
     <h1>Scan Kehadiran</h1>
-    <div class="acara">WEDDING OF JASMINE &amp; HAIKAL</div>
+    <div class="acara">WEDDING OF HAIKAL &amp; JASMINE</div>
     <div class="cnt" id="statScan">Memuat...</div>
   </div>
   <div class="kamera" id="kamera">
@@ -132,7 +132,7 @@ h1{font-family:var(--serif)}
   </div>
   <div id="infoScan" class="infoscan">Menyiapkan kamera...</div>
   <div class="aksiscan">
-    <button class="btn sek" type="button" onclick="gantiKamera()">Ganti Kamera</button>
+    <button id="btnKam" class="btn sek" type="button" onclick="gantiKamera()">Kamera: Belakang</button>
     <button class="btn" type="button" onclick="bukaCari()">Cari Nama</button>
   </div>
 </div>
@@ -142,7 +142,7 @@ h1{font-family:var(--serif)}
     <div class="eyebrow">Digital Guest Book</div>
     <h1 id="jdl"></h1>
     <div class="orn">✦</div>
-    <div class="acara">WEDDING OF JASMINE &amp; HAIKAL</div>
+    <div class="acara">WEDDING OF HAIKAL &amp; JASMINE</div>
     <div class="cnt" id="cnt"></div>
   </div>
   <div class="tools">
@@ -164,9 +164,15 @@ h1{font-family:var(--serif)}
 <script>
 /* =====================  PENGATURAN  ===================== */
 // URL Web App Apps Script (yang berakhiran /exec)
-var API_URL = 'https://script.google.com/macros/s/AKfycbwpL_BpV22GKb5vq2ZCmmtPlvCQMpVeFriS-Qb3v1YmXhEeNbgtn9UxF8Y9Nd19_z30/exec';
-var ACARA = 'WEDDING OF JASMINE & HAIKAL';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzRB5MnXD7nCBcI6-fY2x4jy4-94rW7XfDauYKhkoBz2ghzVIto6UvmFVGgs-qgk2VD/exec';
+var ACARA = 'WEDDING OF HAIKAL & JASMINE';
+var SINKRON_MS = 25000;   // tarik data terbaru tiap 25 detik (supaya 2 tablet saling tahu)
 /* ======================================================== */
+ 
+/* Pilih kamera lewat link (berguna untuk 2 tablet):
+     index.html?kamera=depan     -> tablet kamera depan (tamu menghadapkan QR ke tablet)
+     index.html?kamera=belakang  -> tablet kamera belakang
+   Tanpa parameter: memakai pilihan terakhir di tablet itu (tombol "Kamera"). */
  
 var MODE = 'scan';
 var DATA = null;
@@ -178,10 +184,120 @@ var IKON = {
   error: '<svg class="cincin" viewBox="0 0 110 110"><circle class="ring" cx="55" cy="55" r="50"/><path d="M39 39 L71 71"/><path d="M71 39 L39 71"/></svg>'
 };
 var WARNA = {success:'#d4b46a',info:'#9db8d8',warning:'#e3a95f',error:'#e08e8e'};
-var sibuk = false, jalan = false, stream = null, fm = 'environment';
+var sibuk = false, jalan = false, stream = null, fm = kameraAwal();
 var terakhir = '', tTerakhir = 0, timerHasil = null, aksiTutup = null, audio = null;
 var cv = document.createElement('canvas');
 var ctx = cv.getContext('2d', {willReadFrequently: true});
+ 
+/* ---------- data lokal (cache) + antrean kirim ----------
+   Seluruh daftar tamu disimpan di tablet. Saat QR terbaca, "Selamat Datang" tampil
+   seketika dari data lokal, lalu disimpan ke Google Sheet di latar belakang.
+   Jika internet putus, data masuk antrean dan dikirim ulang otomatis.            */
+var TAMU = [], INDEKS = {}, siap = false, verLokal = 0;
+var antre = [], kirimBerjalan = false;
+ 
+function setCache(anggota){
+  TAMU = anggota; INDEKS = {};
+  for (var i = 0; i < TAMU.length; i++) {
+    var k = TAMU[i].nama.toLowerCase();
+    if (!INDEKS[k]) INDEKS[k] = TAMU[i];
+  }
+}
+function hitungHadir(){
+  var h = 0;
+  for (var i = 0; i < TAMU.length; i++) if (TAMU[i].hadir) h++;
+  return h;
+}
+function statLokal(){ updateStat(hitungHadir(), TAMU.length); }
+function jamSekarang(){
+  var d = new Date();
+  return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+}
+function tandaiLokal(row){
+  var j = jamSekarang();
+  verLokal++;
+  var i, t;
+  for (i = 0; i < TAMU.length; i++) if (TAMU[i].row === row) { TAMU[i].hadir = true; TAMU[i].jam = TAMU[i].jam || j; }
+  if (DATA && DATA.anggota) for (i = 0; i < DATA.anggota.length; i++) {
+    t = DATA.anggota[i];
+    if (t.row === row) { t.hadir = true; t.jam = t.jam || j; }
+  }
+}
+function muatCache(){
+  var v = verLokal;
+  return apiDaftar('cari', '').then(function(d){
+    if (antre.length || kirimBerjalan || v !== verLokal) return;
+    setCache(d.anggota); siap = true; statLokal();
+  });
+}
+function mulaiData(){
+  muatCache().then(function(){
+    if (!siap) setTimeout(mulaiData, 1000);
+  }).catch(function(){
+    $('statScan').textContent = 'Gagal memuat data';
+    setTimeout(mulaiData, 3000);
+  });
+}
+function bangunCari(){
+  return {mode:'cari', grup:'', judul:'Cari Nama Tamu', anggota:TAMU, hadir:hitungHadir()};
+}
+function bangunGrup(nama){
+  var target = String(nama).toLowerCase(), a = [], h = 0;
+  for (var i = 0; i < TAMU.length; i++) {
+    if (TAMU[i].g && TAMU[i].kat.toLowerCase() === target) { a.push(TAMU[i]); if (TAMU[i].hadir) h++; }
+  }
+  if (!a.length) return null;
+  return {mode:'grup', grup:a[0].kat, judul:a[0].kat, anggota:a, hadir:h};
+}
+// segarkan daftar yang sedang terbuka tanpa mengganggu orang yang sedang memilih
+function segarkanList(){
+  if (antre.length || kirimBerjalan) return;
+  var d0 = DATA, v = verLokal;
+  apiDaftar(d0.mode, d0.grup).then(function(d){
+    if (antre.length || kirimBerjalan || v !== verLokal) return;
+    if (d0.mode === 'cari') { setCache(d.anggota); siap = true; }
+    if (!listTerbuka() || DATA !== d0) return;
+    if (terpilih().length || $('q').value) return;
+    renderList(d0.mode === 'cari' ? bangunCari() : d);
+  }).catch(function(){});
+}
+ 
+/* antrean pengiriman ke Google Sheet */
+function kirim(job){
+  job.coba = 0; antre.push(job); jalankan();
+}
+function jalankan(){
+  if (kirimBerjalan || !antre.length) return;
+  kirimBerjalan = true;
+  var j = antre[0];
+  var p = (j.tipe === 'checkin') ? apiCheckin(j.nama) : apiSimpan(j.mode, j.grup, j.rows);
+  p.then(function(r){
+    antre.shift(); kirimBerjalan = false;
+    hasilKirim(j, r);
+    if (!antre.length && !sibuk) infoScan('Arahkan QR undangan ke kamera');
+    jalankan();
+  }).catch(function(){
+    j.coba++; kirimBerjalan = false;
+    infoScan('Koneksi bermasalah: ' + antre.length + ' data menunggu terkirim', true);
+    setTimeout(jalankan, Math.min(1000 * j.coba, 5000));
+  });
+}
+function hasilKirim(j, r){
+  if (j.tipe === 'checkin' && j.coba === 0) {
+    if (r.tipe === 'info') {
+      var e = INDEKS[j.nama.toLowerCase()];
+      if (e && !e.hadir) e.hadir = true;
+      tampilHasil({tipe:'info', judul:'Sudah Check-in', nama:[], catatan:r.pesan}, true);
+    } else if (r.tipe === 'error') {
+      tampilHasil({tipe:'error', judul:r.judul, nama:[], catatan:r.pesan}, true);
+    }
+  }
+  if (!antre.length - 1 + 1 && false) return;
+  if (antre.length <= 1 && r && r.hadir != null) updateStat(r.hadir, r.total);
+}
+window.addEventListener('beforeunload', function(e){
+  if (antre.length) { e.preventDefault(); e.returnValue = ''; return ''; }
+});
  
 /* ---------- komunikasi ke Apps Script ---------- */
 function panggil(params){
@@ -210,16 +326,24 @@ function tambah(induk, tag, kelas, teks){
 function updateStat(h, t){
   $('statScan').textContent = h + ' dari ' + t + ' tamu hadir';
 }
-function bunyi(ok){
+function siapkanAudio(){
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch (e) {}
+}
+document.addEventListener('touchstart', siapkanAudio, {passive: true});
+document.addEventListener('click', siapkanAudio);
+function bunyi(ok){
+  try {
+    siapkanAudio();
     var o = audio.createOscillator(), g = audio.createGain();
     o.type = 'sine'; o.frequency.value = ok ? 880 : 330; g.gain.value = 0.06;
     o.connect(g); g.connect(audio.destination);
     o.start(); o.stop(audio.currentTime + (ok ? 0.18 : 0.3));
   } catch (e) {}
 }
-// Umpan balik instan saat QR terbaca (sebelum menunggu server)
+// Umpan balik instan saat QR terbaca
 function kunci(){
   var k = $('kamera');
   k.classList.add('kunci');
@@ -253,8 +377,8 @@ function tampilHasil(h, auto, aksi){
   }
   l.onclick = auto ? tutupHasil : null;
   l.hidden = false;
-  // sukses ditutup lebih cepat supaya antrean tamu tidak menumpuk
-  if (auto) timerHasil = setTimeout(tutupHasil, h.tipe === 'success' ? 2200 : 3500);
+  // sukses ditutup cepat supaya antrean tamu tidak menumpuk (grup lebih lama agar nama terbaca)
+  if (auto) timerHasil = setTimeout(tutupHasil, h.tipe === 'success' ? (nama.length > 1 ? 3200 : 2000) : 3500);
   if (h.hadir != null) updateStat(h.hadir, h.total);
   bunyi(h.tipe === 'success');
 }
@@ -334,30 +458,22 @@ function tutupList(){
   $('vScan').hidden = false;
   sibuk = false;
   infoScan('Arahkan QR undangan ke kamera');
-  apiStat().then(function(s){ updateStat(s.hadir, s.total); }).catch(function(){});
-}
-function muatUlang(){
-  apiDaftar(DATA.mode, DATA.grup).then(renderList).catch(function(e){ pesan('Gagal memuat: ' + e.message); });
+  if (siap) statLokal();
+  if (!antre.length) apiStat().then(function(s){ if (!antre.length) updateStat(s.hadir, s.total); }).catch(function(){});
 }
 function simpan(){
-  var cek = terpilih(), rows = [];
+  var cek = terpilih(), rows = [], nama = [];
   for (var i = 0; i < cek.length; i++) rows.push(Number(cek[i].value));
   if (!rows.length) { pesan('Pilih minimal satu nama.'); return; }
-  var btn = $('btn');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-  apiSimpan(DATA.mode, DATA.grup, rows)
-    .then(function(res){
-      btn.disabled = false; hitung();
-      var h = res.nama.length
-        ? {tipe:'success', judul:'Selamat Datang', nama:res.nama, hadir:res.hadir, total:res.total}
-        : {tipe:'info', judul:'Tidak Ada Perubahan', catatan:'Semua nama yang dipilih sudah tercatat hadir.'};
-      tampilHasil(h, true);
-    })
-    .catch(function(err){
-      btn.disabled = false; hitung();
-      pesan('Gagal menyimpan: ' + err.message);
-    });
+  for (var k = 0; k < DATA.anggota.length; k++) {
+    var t = DATA.anggota[k];
+    if (rows.indexOf(t.row) > -1 && !t.hadir) nama.push(t.nama);
+  }
+  // tampil seketika, simpan ke sheet di latar belakang
+  var mode = DATA.mode, grup = DATA.grup;
+  for (var m = 0; m < rows.length; m++) tandaiLokal(rows[m]);
+  tampilHasil({tipe:'success', judul:'Selamat Datang', nama:nama, hadir:hitungHadir(), total:TAMU.length || DATA.anggota.length}, true);
+  kirim({tipe:'simpan', mode:mode, grup:grup, rows:rows});
 }
  
 /* ---------- scanner ---------- */
@@ -403,7 +519,9 @@ function dariServer(d){
 }
 function bukaCari(){
   if (sibuk) return;
-  sibuk = true; infoScan('Memuat daftar tamu...');
+  sibuk = true;
+  if (siap) { bukaList(bangunCari()); segarkanList(); return; }
+  infoScan('Memuat daftar tamu...');
   apiDaftar('cari', '').then(dariServer).catch(gagalScan);
 }
 function tangani(teks){
@@ -415,45 +533,70 @@ function tangani(teks){
   sibuk = true;
   kunci();
   if (!p) { tampilHasil({tipe:'error', judul:'QR Tidak Valid', catatan:'QR ini bukan QR undangan pernikahan.'}, true); return; }
-  infoScan('Memeriksa data tamu...');
+ 
   if (p.jenis === 'nama') {
+    var t = siap ? INDEKS[p.v.toLowerCase()] : null;
+    if (t && !t.hadir) {                       // tamu baru: tampil seketika
+      tandaiLokal(t.row);
+      tampilHasil({tipe:'success', judul:'Selamat Datang', nama:[t.nama], hadir:hitungHadir(), total:TAMU.length}, true);
+      kirim({tipe:'checkin', nama:t.nama});
+      return;
+    }
+    if (t && t.hadir) {                        // sudah check-in
+      tampilHasil({tipe:'info', judul:'Sudah Check-in', nama:[], catatan:t.nama + ' sudah tercatat hadir pukul ' + (t.jam || '-') + '.'}, true);
+      return;
+    }
+    infoScan('Memeriksa data tamu...');        // belum ada di data lokal: tanya server
     apiCheckin(p.v).then(function(r){
       var ok = r.tipe === 'success';
+      if (ok && INDEKS[p.v.toLowerCase()]) tandaiLokal(INDEKS[p.v.toLowerCase()].row);
       tampilHasil({tipe:r.tipe, judul:r.judul, nama: ok ? [r.nama] : [], catatan: ok ? '' : r.pesan, hadir:r.hadir, total:r.total}, true);
     }).catch(gagalScan);
   } else if (p.jenis === 'grup') {
+    var d = siap ? bangunGrup(p.v) : null;
+    if (d) { bukaList(d); segarkanList(); return; }   // daftar grup langsung terbuka
+    infoScan('Memuat daftar grup...');
     apiDaftar('grup', p.v).then(dariServer).catch(gagalScan);
   } else {
+    if (siap) { bukaList(bangunCari()); segarkanList(); return; }
+    infoScan('Memuat daftar tamu...');
     apiDaftar('cari', '').then(dariServer).catch(gagalScan);
   }
 }
  
-/* ---------- pembaca QR ----------
-   1) BarcodeDetector bawaan browser (Chrome Android) - tercepat.
-   2) jsQR sebagai cadangan (iPhone/iPad Safari), dengan trik kecepatan:
-      - hanya memindai area tengah (persegi), bukan seluruh frame
-      - ukuran gambar bergantian (640/900/480/1200 px): ukuran kecil = sangat cepat
-        dan meredam moire layar; ukuran besar = QR padat/jauh tetap terbaca
-      - mode normal tiap frame, mode QR terbalik hanya tiap 5 frame            */
+/* ---------- pembaca QR (SAMA untuk kamera depan & belakang) ----------
+   1) BarcodeDetector bawaan browser (Chrome/Android) - tercepat, membaca seluruh frame.
+   2) jsQR (iPhone/iPad Safari, atau cadangan) dengan beberapa "tampilan" bergantian:
+      tengah 92% (640px), seluruh frame (800px), tengah 70% (480px), tengah 92% (1000px)
+      -> QR dekat, jauh, kecil, maupun layar HP yang berpola (moire) tetap terbaca.
+      Mode QR terbalik (putih di gelap) dicoba tiap 5 frame.
+   Preview kamera depan hanya dicerminkan di layar; gambar yang dibaca tetap asli,
+   jadi QR tidak pernah terbaca terbalik.                                              */
 var detektor = null, mendeteksi = false, nFrame = 0;
-var SKALA = [640, 900, 480, 1200];
+var TAMPILAN = [{c:0.92, s:640}, {c:1, s:800}, {c:0.7, s:480}, {c:0.92, s:1000}];
 try { if ('BarcodeDetector' in window) detektor = new BarcodeDetector({formats: ['qr_code']}); } catch (e) { detektor = null; }
  
 function bacaJsQR(vid){
   if (typeof jsQR !== 'function') return null;
   var vw = vid.videoWidth, vh = vid.videoHeight;
-  var sisi = Math.round(Math.min(vw, vh) * 0.92);
-  var sx = Math.round((vw - sisi) / 2), sy = Math.round((vh - sisi) / 2);
-  var dst = Math.min(SKALA[nFrame % SKALA.length], sisi);
-  cv.width = dst; cv.height = dst;
+  var p = TAMPILAN[nFrame % TAMPILAN.length];
+  var sx, sy, sw, sh;
+  if (p.c >= 1) { sx = 0; sy = 0; sw = vw; sh = vh; }
+  else {
+    var sisi = Math.round(Math.min(vw, vh) * p.c);
+    sw = sh = sisi; sx = Math.round((vw - sisi) / 2); sy = Math.round((vh - sisi) / 2);
+  }
+  var k = Math.min(1, p.s / Math.max(sw, sh));
+  var dw = Math.max(1, Math.round(sw * k)), dh = Math.max(1, Math.round(sh * k));
+  cv.width = dw; cv.height = dh;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(vid, sx, sy, sisi, sisi, 0, 0, dst, dst);
-  var img = ctx.getImageData(0, 0, dst, dst);
+  ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, dw, dh);
+  var img = ctx.getImageData(0, 0, dw, dh);
   var mode = (nFrame % 5 === 4) ? 'onlyInvert' : 'dontInvert';
   nFrame++;
-  var k = jsQR(img.data, dst, dst, {inversionAttempts: mode});
-  return (k && k.data) ? k.data : null;
+  var hasil = jsQR(img.data, dw, dh, {inversionAttempts: mode});
+  return (hasil && hasil.data) ? hasil.data : null;
 }
 function pindai(){
   var vid = $('vid');
@@ -470,7 +613,7 @@ function pindai(){
         .then(function(t){
           mendeteksi = false;
           if (t) tangani(t);
-          setTimeout(pindai, 30);
+          setTimeout(pindai, 20);
         });
       return;
     }
@@ -478,34 +621,70 @@ function pindai(){
     try { t = bacaJsQR(vid); } catch (e) {}
     if (t) tangani(t);
   }
-  setTimeout(pindai, 30);
+  setTimeout(pindai, 20);
+}
+ 
+/* ---------- kamera ---------- */
+function kameraAwal(){
+  var s = '';
+  try { s = (location.search.match(/[?&]kamera=([^&]+)/) || [])[1] || ''; } catch (e) {}
+  s = s.toLowerCase();
+  if (s === 'depan' || s === 'front' || s === 'user') return 'user';
+  if (s === 'belakang' || s === 'back' || s === 'environment') return 'environment';
+  try {
+    var v = localStorage.getItem('gb_kamera');
+    if (v === 'user' || v === 'environment') return v;
+  } catch (e) {}
+  return 'environment';
+}
+function labelKamera(){
+  $('btnKam').textContent = 'Kamera: ' + (fm === 'user' ? 'Depan' : 'Belakang');
 }
 function stopKamera(){
   jalan = false;
-  if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+  if (stream) {
+    stream.getTracks().forEach(function(t){ t.onended = null; t.stop(); });
+    stream = null;
+  }
+}
+function pasangStream(s){
+  stream = s;
+  var vid = $('vid');
+  vid.className = fm === 'user' ? 'cermin' : '';
+  vid.srcObject = s;
+  try {
+    var tr = s.getVideoTracks()[0];
+    tr.onended = function(){ if (!document.hidden) { stopKamera(); setTimeout(mulaiKamera, 800); } };
+    var cap = tr.getCapabilities ? tr.getCapabilities() : {};
+    var adv = [];
+    if (cap.focusMode && cap.focusMode.indexOf('continuous') > -1) adv.push({focusMode: 'continuous'});
+    if (cap.exposureMode && cap.exposureMode.indexOf('continuous') > -1) adv.push({exposureMode: 'continuous'});
+    if (adv.length) tr.applyConstraints({advanced: adv}).catch(function(){});
+  } catch (e) {}
+  return vid.play();
 }
 function mulaiKamera(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     infoScan('Kamera tidak didukung di browser ini', true); return;
   }
-  navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: fm}, width: {ideal: 1920}, height: {ideal: 1080}}, audio: false})
-    .then(function(s){
-      stream = s;
-      var vid = $('vid');
-      vid.className = fm === 'user' ? 'cermin' : '';
-      vid.srcObject = s;
-      try {
-        var tr = s.getVideoTracks()[0];
-        var cap = tr.getCapabilities ? tr.getCapabilities() : {};
-        if (cap.focusMode && cap.focusMode.indexOf('continuous') > -1) tr.applyConstraints({advanced: [{focusMode: 'continuous'}]});
-      } catch (e) {}
-      return vid.play();
+  labelKamera();
+  var md = navigator.mediaDevices;
+  md.getUserMedia({video: {facingMode: {ideal: fm}, width: {ideal: 1920}, height: {ideal: 1080}, frameRate: {ideal: 30}}, audio: false})
+    .catch(function(e){
+      // tablet tertentu menolak resolusi/facingMode tertentu: coba lagi lebih longgar
+      if (e && (e.name === 'OverconstrainedError' || e.name === 'NotFoundError')) {
+        return md.getUserMedia({video: {facingMode: {ideal: fm}}, audio: false})
+          .catch(function(){ return md.getUserMedia({video: true, audio: false}); });
+      }
+      throw e;
     })
+    .then(pasangStream)
     .then(function(){ jalan = true; infoScan('Arahkan QR undangan ke kamera'); })
     .catch(function(e){ infoScan('Kamera tidak bisa dibuka (' + e.name + '). Izinkan akses kamera.', true); });
 }
 function gantiKamera(){
   fm = fm === 'environment' ? 'user' : 'environment';
+  try { localStorage.setItem('gb_kamera', fm); } catch (e) {}
   stopKamera(); mulaiKamera();
 }
 function kunciLayar(){
@@ -515,9 +694,24 @@ function kunciLayar(){
 /* ---------- mulai ---------- */
 $('vScan').hidden = false;
 $('btnKembali').hidden = false;
-apiStat().then(function(s){ STAT = s; updateStat(s.hadir, s.total); })
-  .catch(function(e){ $('statScan').textContent = 'Gagal memuat data'; });
+mulaiData();
 mulaiKamera(); pindai(); kunciLayar();
+ 
+// sinkron berkala supaya 2 tablet saling tahu siapa yang sudah hadir
+setInterval(function(){
+  if (siap && !document.hidden && !sibuk && !antre.length && !kirimBerjalan &&
+      $('vList').hidden && $('vHasil').hidden) muatCache().catch(function(){});
+}, SINKRON_MS);
+ 
+// penjaga kamera: jika gambar membeku (tablet tidur / kamera diambil aplikasi lain) mulai ulang
+var tVid = -1, bekuN = 0;
+setInterval(function(){
+  var vid = $('vid');
+  if (!jalan || document.hidden) { bekuN = 0; return; }
+  if (vid.currentTime === tVid) { bekuN++; } else { bekuN = 0; tVid = vid.currentTime; }
+  if (bekuN >= 2) { bekuN = 0; stopKamera(); mulaiKamera(); }
+}, 3000);
+ 
 document.addEventListener('visibilitychange', function(){
   if (!document.hidden) { kunciLayar(); if (!stream && !$('vScan').hidden) mulaiKamera(); }
 });
